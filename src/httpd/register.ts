@@ -65,8 +65,8 @@ const bindRouter = async (router: Router, ctl: any) => {
     const route = router.bind(method, basePath + path);
     route.to(ctl[key].bind(ctl));
     route.doc.tags.push(...ctlTags, ...(tags || []));
-    route.doc.description = description || key.toString();
-    route.doc.summary = summary;
+    route.doc.description = description ;
+    route.doc.summary = summary || key.toString();
   });
 };
 

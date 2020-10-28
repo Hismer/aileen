@@ -1,6 +1,6 @@
 {
   "name": "aileen",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Aileen Framework For Batter Nodejs App",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
