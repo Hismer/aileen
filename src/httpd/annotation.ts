@@ -7,6 +7,8 @@ import { HTTPMethod } from "trouter";
  */
 export interface ControllerAnnotation {
   path?: string;
+  tag?: string;
+  tags?: string[];
 }
 
 /**
@@ -33,8 +35,11 @@ export const Controller = (options: ControllerAnnotation = {}) => (
  * HTTP接口
  */
 export interface HttpAnnotation {
-  method: HTTPMethod;
-  path: string;
+  method?: HTTPMethod;
+  path?: string;
+  tags?: string[];
+  summary?: string;
+  description?: string;
 }
 
 /**
@@ -66,3 +71,8 @@ export const POST = (path: string) => HTTP({ method: "POST", path });
 export const PUT = (path: string) => HTTP({ method: "PUT", path });
 export const PATCH = (path: string) => HTTP({ method: "PATCH", path });
 export const DELETE = (path: string) => HTTP({ method: "DELETE", path });
+
+// 文档申明注解
+export const Tags = (...names: string[]) => HTTP({ tags: names });
+export const Description = (description: string) => HTTP({ description });
+export const Summary = (summary: string) => HTTP({ summary });

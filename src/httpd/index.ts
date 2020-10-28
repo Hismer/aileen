@@ -1,5 +1,6 @@
+export { Context, Next } from "koa";
+export { HTTPMethod } from "trouter";
 import { register } from "./register";
-export { Context } from "koa";
 export * from "./annotation";
 export * from "./router";
 export * from "./register";

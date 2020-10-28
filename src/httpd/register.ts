@@ -6,7 +6,7 @@ import { koaSwagger } from "koa2-swagger-ui";
 import { Router } from "./router";
 import { Booter } from "../core";
 import { Context, Next } from "koa";
-import { ControllerReflect, HttpReflect } from "./annotation";
+import { ControllerReflect, HttpReflect, HttpAnnotation } from "./annotation";
 
 /**
  * BODY解析器
@@ -29,9 +29,46 @@ const compressor = compress({
  */
 export interface Option {
   port?: number;
-  doc?: string;
-  swagger?: any;
+  enableDoc?: boolean;
 }
+
+/**
+ * 注册路由
+ * @param router
+ * @param ctl
+ */
+const bindRouter = async (router: Router, ctl: any) => {
+  // 反射控制器
+  const ctlRef = ControllerReflect.getMetadata(ctl);
+  if (!ctlRef) return;
+
+  // 标签生成
+  const ctlTags = ctlRef.metas[0].tags || [];
+  if (ctlRef.metas[0].tag) ctlTags.push(ctlRef.metas[0].tag);
+  if (!ctlTags.length) ctlTags.push((<Function>ctlRef.target).name);
+
+  // 基础路径
+  const basePath = ctlRef.metas[0].path;
+
+  // 控制器初始化
+  if (ctl.init instanceof Function) await ctl.init();
+
+  // 反射方法
+  const httpRef = HttpReflect.getMetadata(ctl);
+  if (!httpRef) return;
+
+  // 注册路由
+  httpRef.method.forEach((meta, key) => {
+    const { method, path, tags, summary, description } = <HttpAnnotation>(
+      Object.assign({}, ...meta.metas)
+    );
+    const route = router.bind(method, basePath + path);
+    route.to(ctl[key].bind(ctl));
+    route.doc.tags.push(...ctlTags, ...(tags || []));
+    route.doc.description = description || key.toString();
+    route.doc.summary = summary;
+  });
+};
 
 /**
  * 注册启动器
@@ -41,7 +78,7 @@ export const register = (option: Option = {}): Booter => async (app, next) => {
   // 合并配置
   const config = {
     port: 7001,
-    doc: "/docs",
+    enableDoc: true,
     ...option,
   };
 
@@ -51,12 +88,14 @@ export const register = (option: Option = {}): Booter => async (app, next) => {
   server.use(bodyParser);
   server.use(compressor);
   app.bind(Koa).toValue(server);
-
-  // 注册路由
   app.register(Router);
 
   // 后续操作
   await next();
+
+  // 加载路由
+  const router: Router = await app.getBean(Router);
+  const controllers = await app.getBeansByTag("controller");
 
   // 日志中间件
   const logger = async (ctx: Context, next: Next) => {
@@ -73,43 +112,24 @@ export const register = (option: Option = {}): Booter => async (app, next) => {
   };
 
   // 文档启用
-  if (config.swagger) {
-    const url = config.doc + "/doc.json";
+  if (config.enableDoc) {
+    const url = "/docs/doc.json";
     server.use((ctx, next) => {
       if (ctx.path !== url) return next();
-      ctx.body = config.swagger;
+      ctx.body = router.getSwaggerDoc();
     });
     server.use(
       koaSwagger({
-        routePrefix: config.doc + "/index.html",
+        routePrefix: "/docs/index.html",
         hideTopbar: true,
         swaggerOptions: { url },
       })
     );
   }
 
-  // 获取路由
-  const router: Router = await app.getBean(Router);
-
-  // 获取所有控制器
-  const controllers = await app.getBeansByTag("controller");
-
   // 注册路由
   for (const ctl of controllers) {
-    const ctlRef = ControllerReflect.getMetadata(ctl);
-    if (!ctlRef) continue;
-
-    const basePath = ctlRef.metas[0].path;
-    if (ctl.init instanceof Function) await ctl.init();
-
-    const httpRef = HttpReflect.getMetadata(ctl);
-    if (!httpRef) continue;
-
-    httpRef.method.forEach((meta, key) => {
-      const { method, path } = meta.metas[0];
-      const action = ctl[key].bind(ctl);
-      router.register(method, basePath + path, action);
-    });
+    await bindRouter(router, ctl);
   }
 
   // 处理请求
