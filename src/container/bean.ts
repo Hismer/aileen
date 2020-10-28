@@ -119,9 +119,18 @@ export class Bean<T = any> {
    * 绑定工厂
    * @param fun
    */
-  public toFactory(fun: Factory) {
+  public toFactory(fun: Factory): Bean {
     this.entity = undefined;
     this.factory = fun;
+    return this;
+  }
+
+  /**
+   * 添加标签
+   * @param keys
+   */
+  public tag(...keys: string[]): Bean {
+    this.container.tag(this.id, ...keys);
     return this;
   }
 }

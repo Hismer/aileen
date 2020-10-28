@@ -63,7 +63,10 @@ export const Autowride = (id?: ID | Factory) => (
 /**
  * 组件注入注解申明
  */
-export interface ComponentAnnotation {}
+export interface ComponentAnnotation {
+  id?: ID;
+  tags?: string[];
+}
 
 /**
  * 参数注入注解对象
@@ -74,6 +77,12 @@ export const ComponentReflect = new AnnotationReflect<ComponentAnnotation>();
  * 自动解析注解
  * @param id
  */
-export const Component = () => (target: Function) => {
-  AutowridReflect.defineMetadata({ target });
+export const Component = (options: ComponentAnnotation = {}) => (
+  target: Function
+) => {
+  ComponentReflect.defineMetadata({
+    target,
+    tags: [],
+    ...options,
+  });
 };

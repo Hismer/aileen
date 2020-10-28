@@ -1,7 +1,6 @@
 import { Container } from "../container";
 import compose from "koa-compose";
 import { Next } from "koa";
-import { Config } from './config';
 
 /**
  * 启动器

@@ -1,5 +1,3 @@
-import "reflect-metadata";
-
 /**
  * 注解信息
  */
@@ -161,7 +159,7 @@ export class AnnotationReflect<T> {
   /**
    * 唯一标识
    */
-  public readonly id = Symbol.for("id");
+  public readonly id = Symbol();
 
   /**
    * 获取标注

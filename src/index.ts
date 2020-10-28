@@ -1,3 +1,5 @@
+import "reflect-metadata";
+
 // 核心模型
 export * from "./core/index";
 export * from "./container/index";

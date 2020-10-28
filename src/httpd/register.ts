@@ -6,13 +6,14 @@ import { koaSwagger } from "koa2-swagger-ui";
 import { Router } from "./router";
 import { Booter } from "../core";
 import { Context, Next } from "koa";
+import { ControllerReflect, HttpReflect } from "./annotation";
 
 /**
  * BODY解析器
  */
 const bodyParser = body({
   multipart: true,
-  formidable: { maxFileSize: 200 * 1024 * 1024 },
+  formidable: { maxFileSize: 5 * 1024 * 1024 * 1024 },
 });
 
 /**
@@ -90,11 +91,30 @@ export const register = (option: Option = {}): Booter => async (app, next) => {
   // 获取路由
   const router: Router = await app.getBean(Router);
 
+  // 获取所有控制器
+  const controllers = await app.getBeansByTag("controller");
+
+  // 注册路由
+  for (const ctl of controllers) {
+    const ctlRef = ControllerReflect.getMetadata(ctl);
+    if (!ctlRef) continue;
+
+    const basePath = ctlRef.metas[0].path;
+    if (ctl.init instanceof Function) await ctl.init();
+
+    const httpRef = HttpReflect.getMetadata(ctl);
+    if (!httpRef) continue;
+
+    httpRef.method.forEach((meta, key) => {
+      const { method, path } = meta.metas[0];
+      const action = ctl[key].bind(ctl);
+      router.register(method, basePath + path, action);
+    });
+  }
+
   // 处理请求
   server.use(logger);
-  server.use(async (ctx) => {
-    await router.handle(ctx);
-  });
+  server.use((ctx) => router.handle(ctx));
 
   // 监听端口
   server.listen(config.port, () => {

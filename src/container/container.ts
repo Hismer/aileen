@@ -9,6 +9,7 @@ import {
 } from "./annotation";
 import { PropertyMetaData, MethodMetaData } from "../core/reflect";
 import { dirname, join } from "path";
+import { Newable } from "../core/basic";
 
 /**
  * 容器管理对象
@@ -25,10 +26,33 @@ export class Container {
   protected binds: Map<ID, Bean> = new Map();
 
   /**
+   * 标签集
+   */
+  protected tags: {
+    [key: string]: Bean[];
+  } = {};
+
+  /**
    * 构造方法
    */
   constructor() {
     this.bind(Container).toValue(this);
+  }
+
+  /**
+   * 给Bean添加标签
+   * @param id
+   * @param key
+   */
+  public tag(id: ID, ...keys: string[]) {
+    const bean = this.binds.get(id);
+    if (!bean) throw new Error("容器未注册");
+
+    for (const key of keys) {
+      if (!this.tags[key]) this.tags[key] = [];
+      if (this.tags[key].includes(bean)) continue;
+      this.tags[key].push(bean);
+    }
   }
 
   /**
@@ -58,6 +82,16 @@ export class Container {
     let bean = this.binds.get(id);
     if (bean !== undefined) return await bean.get();
     throw new Error("ID解析失败");
+  }
+
+  /**
+   * 通过标签获取所有依赖
+   * @param key
+   */
+  public async getBeansByTag(key: string): Promise<any[]> {
+    if (!this.tags[key]) return [];
+    const jobs = this.tags[key].map((bean) => bean.get());
+    return await Promise.all(jobs);
   }
 
   /**
@@ -159,10 +193,17 @@ export class Container {
    * 注册组件
    * @param target
    */
-  public register(target: Function) {
+  public register(target: Newable<any>) {
     const meta = ComponentReflect.getMetadata(target);
     if (!meta) return;
-    this.bind(target).toSelf();
+
+    // 参数解析
+    const { id, tags } = meta.metas[0];
+
+    // 类型绑定
+    this.bind(id || target)
+      .to(target)
+      .tag(...tags);
   }
 
   /**
