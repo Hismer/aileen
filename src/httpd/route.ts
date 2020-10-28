@@ -62,7 +62,7 @@ export class Route {
   constructor(option: Option) {
     this._host = option.host || "*";
     this._method = option.method;
-    this._path = option.method;
+    this._path = option.path;
     this._action = option.action;
   }
 
@@ -107,8 +107,8 @@ export class Route {
       doc.paths[this.path] = {};
     }
     // 注册文档
-    if (doc.paths[this.path][this.method]) {
-      doc.paths[this.path][this.method] = this.doc;
-    }
+    const path = doc.paths[this.path];
+    const method = this.method.toLowerCase();
+    if (!path[method]) path[method] = this.doc;
   }
 }

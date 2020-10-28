@@ -56,21 +56,21 @@ export const HTTP = (option: HttpAnnotation) => (
   propertyKey: string,
   descriptor?: PropertyDescriptor
 ) => {
+  if (!option.path) option.path = "";
   HttpReflect.defineMetadata({
     target,
     propertyKey,
     descriptor,
-    path: "",
     ...option,
   });
 };
 
 // 请求方法注解
-export const GET = (path: string) => HTTP({ method: "GET", path });
-export const POST = (path: string) => HTTP({ method: "POST", path });
-export const PUT = (path: string) => HTTP({ method: "PUT", path });
-export const PATCH = (path: string) => HTTP({ method: "PATCH", path });
-export const DELETE = (path: string) => HTTP({ method: "DELETE", path });
+export const GET = (path?: string) => HTTP({ method: "GET", path });
+export const POST = (path?: string) => HTTP({ method: "POST", path });
+export const PUT = (path?: string) => HTTP({ method: "PUT", path });
+export const PATCH = (path?: string) => HTTP({ method: "PATCH", path });
+export const DELETE = (path?: string) => HTTP({ method: "DELETE", path });
 
 // 文档申明注解
 export const Tags = (...names: string[]) => HTTP({ tags: names });
