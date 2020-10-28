@@ -1,0 +1,54 @@
+{
+  "name": "aileen",
+  "version": "0.0.1",
+  "description": "Aileen Framework For Batter Nodejs App",
+  "main": "index.js",
+  "scripts": {
+    "prettier": "prettier --write '**/*.{js,jsx,tsx,ts,less,md,json}'",
+    "build": "tsc",
+    "test": "cross-env NODE_ENV=dev ts-mocha --exit test/**/*.*.ts",
+    "cov": "nyc --reporter=lcov npm run test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hismer/aileen.git"
+  },
+  "keywords": [
+    "Framework"
+  ],
+  "author": "胡永强",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Hismer/aileen/issues"
+  },
+  "homepage": "https://github.com/Hismer/aileen#readme",
+  "devDependencies": {
+    "@types/callsite": "^1.0.30",
+    "@types/koa": "^2.11.6",
+    "@types/koa-compose": "^3.2.5",
+    "@types/koa-compress": "^4.0.1",
+    "@types/koa2-cors": "^2.0.1",
+    "@types/mocha": "^8.0.3",
+    "@types/node": "^14.14.5",
+    "@types/power-assert": "^1.5.3",
+    "@types/trouter": "^3.1.0",
+    "mocha": "^8.2.0",
+    "nyc": "^15.1.0",
+    "power-assert": "^1.6.1",
+    "prettier": "^2.1.2",
+    "ts-mocha": "^8.0.0",
+    "ts-node": "^9.0.0",
+    "typescript": "^4.0.5"
+  },
+  "dependencies": {
+    "callsite": "^1.0.0",
+    "koa": "^2.13.0",
+    "koa-body": "^4.2.0",
+    "koa-compose": "^4.1.0",
+    "koa-compress": "^5.0.1",
+    "koa2-cors": "^2.0.6",
+    "koa2-swagger-ui": "^5.0.3",
+    "reflect-metadata": "^0.1.13",
+    "trouter": "^3.1.0"
+  }
+}
