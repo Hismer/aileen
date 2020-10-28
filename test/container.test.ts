@@ -1,5 +1,6 @@
 import assert from "power-assert";
-import { Container, Autowride } from "../src";
+import { container } from "../src";
+const { Container, Autowride, Component } = container;
 
 describe("[框架] 依赖注入容器测试", () => {
   it("测试定值对象读写", async () => {
@@ -87,6 +88,7 @@ describe("[框架] 依赖注入容器测试", () => {
     container.bind("test").toValue(123456);
 
     // 创建测试对象
+    @Component()
     class Test {
       @Autowride("test")
       demo1: number;
