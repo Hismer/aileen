@@ -28,7 +28,7 @@ export class Container {
   /**
    * 标签集
    */
-  protected tags: {
+  public readonly tags: {
     [key: string]: Bean[];
   } = {};
 

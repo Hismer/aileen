@@ -14,27 +14,39 @@ export class Bean<T = any> {
   /**
    * 依赖注入标识
    */
-  private id: ID;
+  public readonly id: ID;
 
   /**
    * 所属依赖容器
    */
-  private container: Container;
+  protected container: Container;
 
   /**
    * 实例创建工厂
    */
-  private factory: Factory;
+  protected factory: Factory;
 
   /**
    * 是否是单一实例
    */
-  private singleton = true;
+  protected singleton = true;
 
   /**
    * 已创建实例
    */
-  private entity: Promise<T>;
+  protected entity: Promise<T>;
+
+  /**
+   * 类型反射
+   */
+  protected _ref: Function;
+
+  /**
+   * 获取反射
+   */
+  public get ref() {
+    return this._ref;
+  }
 
   /**
    * 构造方法
@@ -94,6 +106,7 @@ export class Bean<T = any> {
    */
   to<T>(constructor: Newable<T>) {
     this.entity = undefined;
+    this._ref = constructor;
     this.factory = (): any => new constructor();
     return this;
   }
