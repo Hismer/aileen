@@ -1,6 +1,7 @@
 import { Booter } from "../core";
 import { createConnections, ConnectionOptions } from "typeorm";
 import { RepositoryReflect } from "./annotation";
+import { Logger } from "../logger";
 
 /**
  * 注册ORM模块
@@ -8,6 +9,8 @@ import { RepositoryReflect } from "./annotation";
 export const register = (
   option: ConnectionOptions | ConnectionOptions[]
 ): Booter => async (app, next) => {
+  const logger = await app.getBean<Logger>(Logger);
+
   // 参数预处理
   const map: { [key: string]: ConnectionOptions & any } = {};
   const options = option instanceof Array ? option : [option];
@@ -21,7 +24,10 @@ export const register = (
     const beanRef = bean.ref;
 
     if (!beanRef) {
-      console.log("[WARN]", bean.id.toString(), "无法注册为仓库");
+      logger.warn("plugin.orm", {
+        beanId: bean.id.toString(),
+        message: "无法注册为仓库",
+      });
       continue;
     }
 
@@ -30,7 +36,10 @@ export const register = (
     const option = map[connection];
 
     if (!option) {
-      console.log("[WARN]", connection, "数据库连接未配置");
+      logger.warn("plugin.orm", {
+        connection,
+        message: "数据库连接未配置",
+      });
       continue;
     }
 
@@ -43,8 +52,7 @@ export const register = (
 
   // 建立连接
   const connects = await createConnections(options);
-  console.log("[orm] 数据库连接成功");
-  const jobs = [];
+  logger.debug("plugin.orm", { message: "数据库连接成功" });
 
   // 注册数据仓库
   for (const connect of connects) {
@@ -55,16 +63,15 @@ export const register = (
     const { repositorys } = <any>connect.options;
     if (!repositorys) continue;
 
-    jobs.push(
-      ...repositorys.map(async (repo: any) => {
-        const cusRepo = manager.getCustomRepository(repo);
+    repositorys.map(async (repo: any) => {
+      const cusRepo = manager.getCustomRepository(repo);
+      app.bind(repo).toFactory(async () => {
         await app.resolve(cusRepo);
-        app.bind(repo).toValue(cusRepo);
-      })
-    );
+        return cusRepo;
+      });
+    });
   }
 
   await next();
-  await Promise.all(jobs);
-  console.log("[orm] 数据仓库注册完成");
+  logger.debug("plugin.orm", { message: "数据仓库注册完成" });
 };

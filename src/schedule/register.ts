@@ -23,6 +23,7 @@ export const register = (option: Option = {}): Booter => async (app, next) => {
   // 注册定时器
   for (const sch of schedules) {
     const ref = TaskReflect.getMetadata(sch);
+    if (!ref) continue;
     ref.method.forEach((meta, key) => {
       const { cron } = meta.metas[0];
       const action = sch[key].bind(sch);

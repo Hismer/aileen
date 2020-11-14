@@ -16,11 +16,6 @@ import { Newable } from "../core/basic";
  */
 export class Container {
   /**
-   * 类对象绑定ID
-   */
-  protected classBindID = Symbol("ID");
-
-  /**
    * 绑定表
    */
   protected binds: Map<ID, Bean> = new Map();
@@ -63,11 +58,6 @@ export class Container {
     let bean = this.binds.get(id);
     if (bean) return bean;
 
-    // 类作为ID
-    if (id instanceof Function) {
-      Reflect.defineMetadata(this.classBindID, true, id);
-    }
-
     // 创建Bean
     bean = new Bean(this, id);
     this.binds.set(id, bean);
@@ -99,19 +89,19 @@ export class Container {
    * @param id
    */
   protected async getBeanByMetaId(id: ID | Function) {
-    // 常量处理
-    let state = id instanceof Function;
-    if (!state) return await this.getBean(id);
+    // 从Bean进行解析
+    const bean = this.binds.get(id);
+    if (bean) return await bean.get();
 
-    // 函数类型
-    state = Reflect.getMetadata(this.classBindID, id);
-    if (state) return await this.getBean(id);
+    // 函数处理
+    const state = id instanceof Function;
+    if (!state) throw new Error("注入ID参数无效");
 
     // 工厂生成
     try {
       return await (<Function>id)(this);
     } catch (e) {
-      throw new Error("注入函数执行失败");
+      throw new Error("注入函数执行失败:" + e.message);
     }
   }
 

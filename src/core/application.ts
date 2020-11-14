@@ -35,8 +35,7 @@ export class Application extends Container {
   /**
    * 启动项目
    */
-  public async start() {
-    console.log("[app]", "应用启动");
-    await compose(this.boots)(this);
+  public start(): Promise<any> {
+    return compose(this.boots)(this);
   }
 }

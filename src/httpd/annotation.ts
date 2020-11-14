@@ -1,6 +1,7 @@
 import { AnnotationReflect } from "../core/reflect";
 import { Component } from "../container";
 import { HTTPMethod } from "trouter";
+import { Context } from "./";
 
 /**
  * 组件注入注解申明
@@ -40,6 +41,10 @@ export interface HttpAnnotation {
   tags?: string[];
   summary?: string;
   description?: string;
+  cache?: {
+    timeout: number;
+    key: (ctx: Context) => string;
+  };
 }
 
 /**
@@ -56,7 +61,6 @@ export const HTTP = (option: HttpAnnotation) => (
   propertyKey: string,
   descriptor?: PropertyDescriptor
 ) => {
-  if (!option.path) option.path = "";
   HttpReflect.defineMetadata({
     target,
     propertyKey,
@@ -66,13 +70,28 @@ export const HTTP = (option: HttpAnnotation) => (
 };
 
 // 请求方法注解
-export const GET = (path?: string) => HTTP({ method: "GET", path });
-export const POST = (path?: string) => HTTP({ method: "POST", path });
-export const PUT = (path?: string) => HTTP({ method: "PUT", path });
-export const PATCH = (path?: string) => HTTP({ method: "PATCH", path });
-export const DELETE = (path?: string) => HTTP({ method: "DELETE", path });
+export const GET = (path?: string) => HTTP({ method: "GET", path: path || "" });
+export const POST = (path?: string) =>
+  HTTP({ method: "POST", path: path || "" });
+export const PUT = (path?: string) => HTTP({ method: "PUT", path: path || "" });
+export const PATCH = (path?: string) =>
+  HTTP({ method: "PATCH", path: path || "" });
+export const DELETE = (path?: string) =>
+  HTTP({ method: "DELETE", path: path || "" });
 
 // 文档申明注解
 export const Tags = (...names: string[]) => HTTP({ tags: names });
 export const Description = (description: string) => HTTP({ description });
 export const Summary = (summary: string) => HTTP({ summary });
+
+// 默认缓存KEY生成方法
+const defaultCacheKeyBuild = (ctx: Context) => ctx.request.href;
+
+// 接口缓存注解
+export const Cache = (timeout?: number, key?: (ctx: Context) => string) =>
+  HTTP({
+    cache: {
+      timeout: timeout || 60,
+      key: key || defaultCacheKeyBuild,
+    },
+  });

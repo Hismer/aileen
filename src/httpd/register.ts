@@ -7,6 +7,8 @@ import { Router } from "./router";
 import { Booter } from "../core";
 import { Context, Next } from "koa";
 import { ControllerReflect, HttpReflect, HttpAnnotation } from "./annotation";
+import { Application } from "../core";
+import { Logger } from "../logger";
 
 /**
  * BODY解析器
@@ -29,15 +31,27 @@ const compressor = compress({
  */
 export interface Option {
   port?: number;
+  debug?: boolean;
   enableDoc?: boolean;
+  cache?: {
+    enable: boolean;
+    prefix: string;
+  };
 }
 
 /**
  * 注册路由
+ * @param app
+ * @param option
  * @param router
  * @param ctl
  */
-const bindRouter = async (router: Router, ctl: any) => {
+const bindRouter = async (
+  app: Application,
+  option: Option,
+  router: Router,
+  ctl: any
+) => {
   // 反射控制器
   const ctlRef = ControllerReflect.getMetadata(ctl);
   if (!ctlRef) return;
@@ -57,17 +71,37 @@ const bindRouter = async (router: Router, ctl: any) => {
   const httpRef = HttpReflect.getMetadata(ctl);
   if (!httpRef) return;
 
+  // 任务队列
+  const jobs: Promise<any>[] = [];
+
   // 注册路由
   httpRef.method.forEach((meta, key) => {
-    const { method, path, tags, summary, description } = <HttpAnnotation>(
-      Object.assign({}, ...meta.metas)
-    );
+    const { method, path, tags, summary, description, cache } = <
+      HttpAnnotation
+    >Object.assign({}, ...meta.metas);
+
+    // 注册路由
     const route = router.bind(method, basePath + path);
     route.to(ctl[key].bind(ctl));
+
+    // 注册依赖
+    jobs.push(app.resolve(route));
+
+    // 注册缓存
+    if (option.cache && option.cache.enable && cache)
+      route.cache({
+        ...cache,
+        key: (ctx) => `${option.cache.prefix}:${cache.key(ctx)}`,
+      });
+
+    // 文档声明
     route.doc.tags.push(...ctlTags, ...(tags || []));
     route.doc.description = description;
     route.doc.summary = summary || key.toString();
   });
+
+  // 等待执行
+  await Promise.all(jobs);
 };
 
 /**
@@ -75,16 +109,28 @@ const bindRouter = async (router: Router, ctl: any) => {
  * @param app
  */
 export const register = (option: Option = {}): Booter => async (app, next) => {
+  const appLogger = await app.getBean<Logger>(Logger);
+
   // 合并配置
   const config = {
     port: 7001,
     enableDoc: true,
+    debug: false,
     ...option,
   };
 
   // 注册服务
   const server = new Koa();
   server.use(cors());
+
+  // 健康检查
+  server.use((ctx, next) => {
+    if (ctx.path !== "/ping") return next();
+    ctx.body = { ok: true };
+    ctx.status = 200;
+  });
+
+  // 挂载业务
   server.use(bodyParser);
   server.use(compressor);
   app.bind(Koa).toValue(server);
@@ -101,14 +147,15 @@ export const register = (option: Option = {}): Booter => async (app, next) => {
   const logger = async (ctx: Context, next: Next) => {
     const time = Date.now();
     await next();
-    console.log(`[DEBUG HTTP START] `);
-    console.log("request url:", ctx.request.method, ctx.request.url);
-    console.log("request headers:", ctx.request.header);
-    console.log("request body:", ctx.request.body);
-    console.log("resopnse status:", ctx.status);
-    console.log("response body:", ctx.body);
-    console.log("response time:", (Date.now() - time) / 1000);
-    console.log(`[DEBUG HTTP END] `);
+    appLogger.debug("httpd.request", {
+      requestMethod: ctx.request.method,
+      requestUrl: ctx.request.url,
+      requestHeader: ctx.request.header,
+      requestBody: ctx.request.body,
+      requestTime: (Date.now() - time) / 1000,
+      responseStatus: ctx.response.status || 200,
+      responseBody: ctx.response.body,
+    });
   };
 
   // 文档启用
@@ -128,16 +175,16 @@ export const register = (option: Option = {}): Booter => async (app, next) => {
   }
 
   // 注册路由
-  for (const ctl of controllers) {
-    await bindRouter(router, ctl);
-  }
+  await Promise.all(
+    controllers.map((ctl) => bindRouter(app, config, router, ctl))
+  );
 
   // 处理请求
-  server.use(logger);
+  if (config.debug) server.use(logger);
   server.use((ctx) => router.handle(ctx));
 
   // 监听端口
   server.listen(config.port, () => {
-    console.log("[httpd]", `监听端口 : ${config.port}`);
+    appLogger.info("plugin.httpd", { message: "监听端口", port: config.port });
   });
 };

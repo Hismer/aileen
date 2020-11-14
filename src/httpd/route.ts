@@ -1,7 +1,13 @@
 import { HTTPMethod } from "trouter";
 import { Context } from "koa";
 import { SwaggerDoc, SwaggerApi } from "./swagger";
+import { Autowride } from "../container";
+import IoRedis, { Redis } from "ioredis";
+import { Logger } from "../logger";
 
+/**
+ * 路由参数
+ */
 export interface Option {
   host?: string;
   path: string;
@@ -9,7 +15,21 @@ export interface Option {
   action?: Function;
 }
 
+/**
+ * 缓存选项
+ */
+export interface CacheOption {
+  timeout: number;
+  key: (ctx: Context) => string;
+}
+
 export class Route {
+  @Autowride(IoRedis)
+  protected redis: Redis;
+
+  @Autowride(Logger)
+  protected logger: Logger;
+
   /**
    * 支持域名
    */
@@ -38,6 +58,20 @@ export class Route {
    * 处理函数
    */
   protected _action: Function;
+
+  /**
+   * 接口缓存
+   */
+  protected _cache?: CacheOption;
+
+  /**
+   * 设置缓存
+   * @param option
+   */
+  public cache(option: CacheOption) {
+    this._cache = option;
+    return this;
+  }
 
   /**
    * 接口文档
@@ -80,14 +114,51 @@ export class Route {
    * @param ctx
    */
   public async handle(ctx: Context) {
+    // 方法未绑定
     if (!this._action) {
       ctx.status = 404;
       return;
     }
+
+    // 从缓存读取数据
+    let key: string;
+    if (this._cache) {
+      key = `controller:${this._cache.key(ctx)}`;
+      try {
+        const value = await this.redis.get(key);
+        const { status, body } = JSON.parse(value);
+        ctx.status = status;
+        ctx.body = body;
+        return;
+      } catch (e) {
+        await this.redis.del(key);
+      }
+    }
+
+    // 执行数据操作
     try {
       await this._action(ctx);
+      if (this._cache) {
+        const value = JSON.stringify({
+          status: ctx.status || 200,
+          body: ctx.body || {},
+        });
+        this.redis.setex(key, this._cache.timeout, value).catch((err) =>
+          this.logger.info("controller", {
+            message: "缓存写入失败",
+            error: err.message,
+          })
+        );
+      }
     } catch (err) {
-      console.log("[error]", err);
+      ctx.status = 500;
+      ctx.body = {
+        message: "未知错误",
+      };
+      this.logger.info("controller", {
+        message: "控制器执行出错",
+        error: err.message,
+      });
     }
   }
 

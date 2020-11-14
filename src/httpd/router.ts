@@ -67,6 +67,7 @@ export class Router {
 
     // 匹配失败
     ctx.status = 404;
+    ctx.body = { message: "资源不存在" };
   }
 
   /**
