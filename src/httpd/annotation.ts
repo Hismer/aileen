@@ -2,6 +2,7 @@ import { AnnotationReflect } from "../core/reflect";
 import { Component } from "../container";
 import { HTTPMethod } from "trouter";
 import { Context } from "./";
+import { SwaggerSchema } from "./swagger";
 
 /**
  * 组件注入注解申明
@@ -41,6 +42,19 @@ export interface HttpAnnotation {
   tags?: string[];
   summary?: string;
   description?: string;
+  params?: Array<{
+    in: "body" | "path" | "query";
+    name: string;
+    description: string;
+    required: boolean;
+    schema?: SwaggerSchema;
+  }>;
+  responses?: {
+    [key: string]: {
+      description?: string;
+      schema?: SwaggerSchema;
+    };
+  };
   cache?: {
     timeout: number;
     key: (ctx: Context) => string;
@@ -83,6 +97,77 @@ export const DELETE = (path?: string) =>
 export const Tags = (...names: string[]) => HTTP({ tags: names });
 export const Description = (description: string) => HTTP({ description });
 export const Summary = (summary: string) => HTTP({ summary });
+
+// 请求参数声明
+export const RequestQuery = (option: {
+  name: string;
+  description: string;
+  required?: boolean;
+  schema?: SwaggerSchema;
+}) =>
+  HTTP({
+    params: [
+      {
+        in: "query",
+        required: false,
+        ...option,
+      },
+    ],
+  });
+
+// 路径参数声明
+export const RequestPath = (option: {
+  name: string;
+  description: string;
+  required?: boolean;
+  schema?: SwaggerSchema;
+}) =>
+  HTTP({
+    params: [
+      {
+        in: "path",
+        required: false,
+        ...option,
+      },
+    ],
+  });
+
+// 路径参数声明
+export const RequestBody = (option: {
+  name: string;
+  description: string;
+  required?: boolean;
+  schema?: SwaggerSchema;
+}) =>
+  HTTP({
+    params: [
+      {
+        in: "body",
+        required: false,
+        ...option,
+      },
+    ],
+  });
+
+/**
+ * 响应结构声明
+ * @param status
+ * @param description
+ * @param schema
+ */
+export const Response = (
+  status: number,
+  description: string,
+  schema?: SwaggerSchema
+) =>
+  HTTP({
+    responses: {
+      [status]: {
+        description,
+        schema,
+      },
+    },
+  });
 
 // 默认缓存KEY生成方法
 const defaultCacheKeyBuild = (ctx: Context) => ctx.request.href;

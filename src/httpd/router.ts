@@ -2,7 +2,24 @@ import Trouter, { HTTPMethod } from "trouter";
 import { Context } from "koa";
 import { Autowride, Container, Component } from "../container";
 import { Route } from "./route";
-import { SwaggerDoc } from "./swagger";
+import { SwaggerDoc, SwaggerModal } from "./swagger";
+
+/**
+ * 文档模型声明
+ */
+const docDefinitions: {
+  [key: string]: SwaggerModal;
+} = {};
+
+/**
+ * 模型申明函数
+ * @param name
+ * @param option
+ */
+export const modelDefinitions = (name: string, option: SwaggerModal) => {
+  docDefinitions[name] = option;
+  return `#/definitions/${name}`;
+};
 
 /**
  * 路由对象
@@ -86,7 +103,7 @@ export class Router {
       },
       tags: [],
       paths: {},
-      definitions: {},
+      definitions: docDefinitions,
     };
     // 循环生成
     for (const route of this.routes) {

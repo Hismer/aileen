@@ -98,6 +98,12 @@ const bindRouter = async (
     route.doc.tags.push(...ctlTags, ...(tags || []));
     route.doc.description = description;
     route.doc.summary = summary || key.toString();
+
+    // 参数申明
+    for (const { params, responses } of meta.metas) {
+      if (params) route.doc.parameters.push(...params);
+      if (responses) Object.assign(route.doc.responses, responses);
+    }
   });
 
   // 等待执行

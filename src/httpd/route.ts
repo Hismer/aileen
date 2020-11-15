@@ -78,6 +78,8 @@ export class Route {
    */
   public readonly doc: SwaggerApi = {
     tags: [],
+    parameters: [],
+    responses: {},
   };
 
   /**
