@@ -1,10 +1,11 @@
 export {
   Column,
+  PrimaryColumn,
   CreateDateColumn,
   ObjectIdColumn,
+  Entity,
   ObjectID,
   Repository,
-  Entity,
   MongoRepository,
 } from "typeorm";
 import { register } from "./register";
