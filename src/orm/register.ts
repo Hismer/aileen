@@ -1,7 +1,35 @@
 import { Booter } from "../core";
-import { createConnections, ConnectionOptions } from "typeorm";
-import { RepositoryReflect } from "./annotation";
+import {
+  createConnections,
+  ConnectionOptions,
+  MongoEntityManager,
+  EntityManager,
+} from "typeorm";
+import { annotation } from "./annotation";
 import { Logger } from "../logger";
+
+/**
+ * ORM管理器
+ */
+interface Managers {
+  [key: string]: MongoEntityManager | EntityManager;
+}
+
+/**
+ * 数据库连接器
+ * @param options
+ */
+const connect = async (options: ConnectionOptions[]): Promise<Managers> => {
+  const connects = await createConnections(options);
+  const managers: Managers = {};
+  for (const connect of connects) {
+    managers[connect.name] =
+      connect.options.type === "mongodb"
+        ? connect.mongoManager
+        : connect.manager;
+  }
+  return managers;
+};
 
 /**
  * 注册ORM模块
@@ -9,69 +37,42 @@ import { Logger } from "../logger";
 export const register = (
   option: ConnectionOptions | ConnectionOptions[]
 ): Booter => async (app, next) => {
-  const logger = await app.getBean<Logger>(Logger);
-
   // 参数预处理
-  const map: { [key: string]: ConnectionOptions & any } = {};
+  const optionMap: { [key: string]: ConnectionOptions & any } = {};
   const options = option instanceof Array ? option : [option];
   for (const option of options) {
-    map[option.name || "default"] = option;
+    optionMap[option.name || "default"] = option;
+    if (!option.entities) (<any>option).entities = [];
   }
 
-  // 实体注册
-  const beans = app.tags["repository"] || [];
-  for (const bean of beans) {
-    const beanRef = bean.ref;
-
-    if (!beanRef) {
-      logger.warn("plugin.orm", {
-        beanId: bean.id.toString(),
-        message: "无法注册为仓库",
-      });
-      continue;
-    }
-
-    const metaRef = RepositoryReflect.getMetadata(beanRef);
-    const { connection, entity } = metaRef.metas[0];
-    const option = map[connection];
-
-    if (!option) {
-      logger.warn("plugin.orm", {
-        connection,
-        message: "数据库连接未配置",
-      });
-      continue;
-    }
-
-    if (!option.entities) option.entities = [];
-    option.entities.push(entity);
-
-    if (!option.repositorys) (<any>option).repositorys = [];
-    option.repositorys.push(beanRef);
+  // 注册实体
+  for (const { type, target } of annotation.registered) {
+    if (type !== "Class") continue;
+    const ref = annotation.getRef(target);
+    const option = optionMap[ref.connection];
+    option.entities.push(ref.entity);
   }
 
-  // 建立连接
-  const connects = await createConnections(options);
-  logger.debug("plugin.orm", { message: "数据库连接成功" });
+  // 发起连接
+  const connection = connect(options);
 
-  // 注册数据仓库
-  for (const connect of connects) {
-    const manager =
-      connect.options.type === "mongodb"
-        ? connect.mongoManager
-        : connect.manager;
-    const { repositorys } = <any>connect.options;
-    if (!repositorys) continue;
-
-    repositorys.map(async (repo: any) => {
-      const cusRepo = manager.getCustomRepository(repo);
-      app.bind(repo).toFactory(async () => {
-        await app.resolve(cusRepo);
-        return cusRepo;
-      });
+  // 注册数据仓
+  for (const { type, target } of annotation.registered) {
+    if (type !== "Class") continue;
+    const ref = annotation.getRef(target);
+    app.bind(<Function>target).toFactory(async () => {
+      const managers = await connection;
+      const cusRepo = managers[ref.connection].getCustomRepository(<any>target);
+      await app.resolve(cusRepo);
+      return cusRepo;
     });
   }
 
+  // 执行后续操作
   await next();
-  logger.debug("plugin.orm", { message: "数据仓库注册完成" });
+  await connection;
+
+  // 日志输出
+  const logger = await app.getBean<Logger>(Logger);
+  logger.debug("plugin.orm", { message: "数据库连接成功" });
 };

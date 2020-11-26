@@ -1,18 +1,17 @@
-import { HTTPMethod } from "trouter";
-import { Context } from "koa";
-import { SwaggerDoc, SwaggerApi } from "./swagger";
+import { Context as BaseContext } from "koa";
 import { Autowride } from "../container";
 import IoRedis, { Redis } from "ioredis";
 import { Logger } from "../logger";
+import { InternalServerError } from "./error";
 
 /**
- * 路由参数
+ * 上下文对象
  */
-export interface Option {
-  host?: string;
-  path: string;
-  method: HTTPMethod;
-  action?: Function;
+export interface Context extends BaseContext {
+  // 路由参数
+  params: {
+    [key: string]: string;
+  };
 }
 
 /**
@@ -31,55 +30,25 @@ export class Route {
   protected logger: Logger;
 
   /**
-   * 支持域名
-   */
-  protected _host: string;
-  get host() {
-    return this._host;
-  }
-
-  /**
-   * 请求路径
-   */
-  protected _path: string;
-  get path() {
-    return this._path;
-  }
-
-  /**
-   * 请求方法
-   */
-  protected _method: HTTPMethod;
-  get method() {
-    return this._method;
-  }
-
-  /**
    * 处理函数
    */
-  protected _action: Function;
+  public action: Function;
+
+  /**
+   * 响应处理
+   */
+  public response: {
+    status: number;
+  };
 
   /**
    * 接口缓存
    */
-  protected _cache?: CacheOption;
-
-  /**
-   * 设置缓存
-   * @param option
-   */
-  public cache(option: CacheOption) {
-    this._cache = option;
-    return this;
-  }
-
-  /**
-   * 接口文档
-   */
-  public readonly doc: SwaggerApi = {
-    tags: [],
-    parameters: [],
-    responses: {},
+  public cache: {
+    enable: boolean;
+    prefix: string;
+    timeout: number;
+    key: (ctx: Context) => string;
   };
 
   /**
@@ -87,101 +56,96 @@ export class Route {
    * @param action
    */
   public to(action: Function) {
-    this._action = action;
+    this.action = action;
     return this;
   }
 
   /**
-   * 构造方法
-   * @param option
+   * 从缓存获取
    */
-  constructor(option: Option) {
-    this._host = option.host || "*";
-    this._method = option.method;
-    this._path = option.path;
-    this._action = option.action;
-  }
+  protected async handleCacheRead(ctx: Context) {
+    const { enable, timeout, prefix, key } = this.cache || {};
+    if (!enable || !timeout) return false;
+    const id = `${prefix}:${key(ctx)}`;
 
-  /**
-   * 匹配路由
-   * @param ctx
-   */
-  public match(ctx: Context): boolean {
-    if (this._host !== "*") return true;
-    return this._host !== ctx.host;
-  }
-
-  /**
-   * 执行操作
-   * @param ctx
-   */
-  public async handle(ctx: Context) {
-    // 方法未绑定
-    if (!this._action) {
-      ctx.status = 404;
-      return;
-    }
-
-    // 从缓存读取数据
-    let key: string;
-    if (this._cache) {
-      key = `controller:${this._cache.key(ctx)}`;
-      try {
-        const value = await this.redis.get(key);
-        const { status, body } = JSON.parse(value);
-        ctx.status = status;
-        ctx.body = body;
-        return;
-      } catch (e) {
-        await this.redis.del(key);
-      }
-    }
-
-    // 执行数据操作
     try {
-      await this._action(ctx);
-      if (this._cache) {
-        const value = JSON.stringify({
+      const value = await this.redis.get(id);
+      const { status, body } = JSON.parse(value);
+      ctx.status = status;
+      ctx.body = body;
+      return true;
+    } catch (e) {
+      await this.redis.del(id);
+      return false;
+    }
+  }
+
+  /**
+   * 写入数据到缓存
+   * @param ctx
+   */
+  protected async handleCacheSave(ctx: Context) {
+    const { enable, timeout, prefix, key } = this.cache || {};
+    if (!enable || !timeout) return;
+    const id = `${prefix}:${key(ctx)}`;
+    try {
+      await this.redis.setex(
+        id,
+        timeout,
+        JSON.stringify({
           status: ctx.status || 200,
-          body: ctx.body || {},
-        });
-        this.redis.setex(key, this._cache.timeout, value).catch((err) =>
-          this.logger.info("controller", {
-            message: "缓存写入失败",
-            error: err.message,
-          })
-        );
-      }
+          body: ctx.body,
+        })
+      );
     } catch (err) {
-      ctx.status = 500;
-      ctx.body = {
-        message: "未知错误",
-      };
       this.logger.info("controller", {
-        message: "控制器执行出错",
+        message: "缓存写入失败",
         error: err.message,
       });
     }
   }
 
   /**
-   * 生成文档
-   * @param doc
+   * 处理请求
+   * @param ctx
    */
-  public swaggerDoc(doc: SwaggerDoc) {
-    // 标签处理
-    for (const tag of this.doc.tags) {
-      const res = doc.tags.find((name) => name === tag);
-      if (res) continue;
-      doc.tags.push({ name: tag });
+  protected async handleRequest(ctx: Context) {
+    const res = await this.action(ctx);
+    if (res !== undefined) ctx.body = res;
+  }
+
+  /**
+   * 执行操作
+   * @param ctx
+   * @param params
+   */
+  public async exec(ctx: Context, params: { [key: string]: string }) {
+    // 挂载路由参数
+    ctx.params = params;
+    if (this.response?.status) {
+      ctx.status = this.response.status;
     }
-    // 首次申明
-    if (!doc.paths[this.path]) {
-      doc.paths[this.path] = {};
+
+    // 从缓存读取数据
+    const cached = await this.handleCacheRead(ctx);
+    if (cached) return;
+
+    // 执行业务处理
+    try {
+      await this.handleRequest(ctx);
+      this.handleCacheSave(ctx);
+    } catch (err) {
+      if (err.status === undefined) {
+        const message = err.message;
+        err = new InternalServerError();
+        this.logger.error("httpd", {
+          message: `接口未知错误:${message}`,
+          url: `${ctx.method} ${ctx.url}`,
+          err,
+        });
+      }
+      ctx.status = err.status;
+      ctx.body = { message: err.message };
     }
-    // 注册文档
-    const path = doc.paths[this.path];
-    const method = this.method.toLowerCase();
-    if (!path[method]) path[method] = this.doc;
   }
 }

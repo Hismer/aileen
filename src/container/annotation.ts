@@ -1,88 +1,58 @@
 import { ID } from "./index";
-import { Factory } from "./bean";
-import { AnnotationReflect } from "../core/reflect";
+import { Annotation } from "../core/annotation";
 
 /**
- * 参数注入注解申明
+ * 可注入配置
  */
-export interface InjectAnnotation {
-  id?: ID | Factory;
+export class InjectableConfig {
+  /**
+   * 注册ID
+   */
+  public id: ID;
+
+  /**
+   * 属性注入
+   */
+  public readonly propertyResolves: {
+    [key: string]: ID;
+  } = {};
+
+  /**
+   * 方法注入
+   */
+  public readonly methodResolves: {
+    [key: string]: ID;
+  } = {};
 }
 
-/**
- * 参数注入注解对象
- */
-export const InjectReflect = new AnnotationReflect<InjectAnnotation>();
+// 创建注解
+const builder = () => new InjectableConfig();
+export const annotation = new Annotation(builder);
 
 /**
- * 参数注入注解
- * @param id
+ * 组件申明
  */
-export const inject = (id?: ID | Factory) => (
-  target: Object,
-  propertyKey: string,
-  parameterIndex: number
-) => {
-  AutowridReflect.defineMetadata({
-    id,
-    target,
-    propertyKey,
-    parameterIndex,
-  });
-};
-
-/**
- * 自动解析接口
- */
-export interface AutowrideAnnotation {
-  id?: ID | Factory;
-}
-
-/**
- * 申明注解对象
- */
-export const AutowridReflect = new AnnotationReflect<AutowrideAnnotation>();
-
-/**
- * 自动解析注解
- * @param id
- */
-export const Autowride = (id?: ID | Factory) => (
-  target: Object,
-  propertyKey: string,
-  descriptor?: PropertyDescriptor
-) => {
-  AutowridReflect.defineMetadata({
-    id,
-    target,
-    propertyKey,
-    descriptor,
-  });
-};
-
-/**
- * 组件注入注解申明
- */
-export interface ComponentAnnotation {
+export interface ComponentOption {
   id?: ID;
-  tags?: string[];
 }
-
-/**
- * 参数注入注解对象
- */
-export const ComponentReflect = new AnnotationReflect<ComponentAnnotation>();
 
 /**
  * 自动解析注解
  * @param id
  */
-export const Component = (options: ComponentAnnotation = {}) => (
-  target: Function
-) => {
-  ComponentReflect.defineMetadata({
-    target,
-    tags: [],
-    ...options,
+export const Component = (id?: ID): ClassDecorator =>
+  annotation.exportDecorator((data, { target }) => {
+    if (id) data.id = id;
+    else data.id = <Function>target;
   });
-};
+
+/**
+ * 自动解析注解
+ * @param id
+ */
+export const Autowride = (id: ID): PropertyDecorator & MethodDecorator =>
+  annotation.exportDecorator((data, { type, propertyKey }) => {
+    const key = propertyKey.toString();
+    if (type === "Property") data.propertyResolves[key] = id;
+    else if (type === "Method") data.methodResolves[key] = id;
+  });

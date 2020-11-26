@@ -1,13 +1,14 @@
 export {
+  Entity,
   Column,
-  PrimaryColumn,
   CreateDateColumn,
   ObjectIdColumn,
-  Entity,
+  PrimaryColumn,
   ObjectID,
   Repository,
   MongoRepository,
 } from "typeorm";
+export { ObjectId } from "mongodb";
 import { register } from "./register";
 export * from "./annotation";
 export * from "./register";

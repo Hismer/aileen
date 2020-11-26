@@ -1,4 +1,18 @@
 import moment from "moment";
+import colors from "colors";
+
+colors.setTheme({
+  silly: "rainbow",
+  input: "grey",
+  verbose: "cyan",
+  prompt: "grey",
+  info: "green",
+  data: "grey",
+  help: "cyan",
+  warn: "yellow",
+  debug: "blue",
+  error: "red",
+});
 
 export interface Options {
   type: "JSON" | "DEBUG";
@@ -54,7 +68,13 @@ export class Logger {
   protected printf(level: string, modular: string, content: Object) {
     if (this.type === "DEBUG") {
       const now = moment().format("YYYY-MM-DD HH:mm:ss");
-      console.log(`[${level}]`, now, modular, content);
+      const style = level.toLowerCase();
+      console.log(
+        `[application.${level}]`[style],
+        now[style],
+        modular[style],
+        content
+      );
     } else if (this.type === "JSON") {
       console.log(
         JSON.stringify({

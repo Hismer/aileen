@@ -1,40 +1,36 @@
-import { AnnotationReflect } from "../core/reflect";
+import { Annotation } from "../core";
 import { Component } from "../container";
 
 /**
- * 任务实例注解
- * @param option
+ * 定时任务配置
  */
-export const Schedule = () => (target: Function) => {
-  Component({ tags: ["schedule"] })(target);
-};
-
-/**
- * 组件注入注解申明
- */
-export interface TaskAnnotation {
-  cron: string;
+export class ScheduleConfig {
+  /**
+   * 任务对象
+   */
+  public tasks: {
+    [key: string]: string[];
+  } = {};
 }
 
-/**
- * 任务注解对象
- */
-export const TaskReflect = new AnnotationReflect<TaskAnnotation>();
+// 创建注解
+const builder = () => new ScheduleConfig();
+export const annotation = new Annotation(builder);
 
 /**
  * 任务实例注解
  * @param option
  */
-export const Task = (option: string | TaskAnnotation) => (
-  target: Object,
-  propertyKey: string,
-  descriptor?: PropertyDescriptor
-) => {
-  const options = typeof option === "string" ? { cron: option } : option;
-  TaskReflect.defineMetadata({
-    target,
-    propertyKey,
-    descriptor,
-    ...options,
+export const Schedule = (): ClassDecorator =>
+  annotation.exportDecorator(() => {}, Component());
+
+/**
+ * 任务实例注解
+ * @param cron
+ */
+export const Task = (cron: string): MethodDecorator =>
+  annotation.exportDecorator((data, { propertyKey }) => {
+    const key = propertyKey.toString();
+    if (!data.tasks[key]) data.tasks[key] = [];
+    data.tasks[key].push(cron);
   });
-};

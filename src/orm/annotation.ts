@@ -1,17 +1,20 @@
-import { Component } from "../container";
-import { AnnotationReflect } from "../core/reflect";
+import { Annotation } from "../core/annotation";
 import {
   EntitySchema,
   EntityRepository as BaseEntityRepository,
 } from "typeorm";
 
 /**
- * 实体反射器
+ * 仓库注解配置
  */
-export const RepositoryReflect = new AnnotationReflect<{
+export class RepositoryConfig {
   connection: string;
   entity: Function | EntitySchema<any>;
-}>();
+}
+
+// 创建注解
+const builder = () => new RepositoryConfig();
+export const annotation = new Annotation(builder);
 
 /**
  * 注解声明
@@ -41,14 +44,10 @@ export function EntityRepository(
     connection = "default";
     entity = connectionOrEntity;
   }
-  // 生成注解
-  return function (target: Function) {
-    BaseEntityRepository(entity)(target);
-    Component({ tags: ["repository"] })(target);
-    RepositoryReflect.defineMetadata({
-      target,
-      connection,
-      entity,
-    });
-  };
+
+  // 注解生成
+  return annotation.exportDecorator((data, { target }) => {
+    data.connection = connection;
+    data.entity = entity;
+  }, BaseEntityRepository(entity));
 }
