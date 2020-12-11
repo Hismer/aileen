@@ -3,6 +3,7 @@ export {
   Column,
   CreateDateColumn,
   ObjectIdColumn,
+  PrimaryGeneratedColumn,
   PrimaryColumn,
   ObjectID,
   Repository,

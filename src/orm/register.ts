@@ -6,6 +6,7 @@ import {
   EntityManager,
 } from "typeorm";
 import { annotation } from "./annotation";
+import { annotation as containerAnno } from "../container/annotation";
 import { Logger } from "../logger";
 
 /**
@@ -60,7 +61,9 @@ export const register = (
   for (const { type, target } of annotation.registered) {
     if (type !== "Class") continue;
     const ref = annotation.getRef(target);
-    app.bind(<Function>target).toFactory(async () => {
+    const containerRef = containerAnno.getRef(target);
+    const id = containerRef?.id || <Function>target;
+    app.bind(id).toFactory(async () => {
       const managers = await connection;
       const cusRepo = managers[ref.connection].getCustomRepository(<any>target);
       await app.resolve(cusRepo);
