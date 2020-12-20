@@ -66,7 +66,7 @@ export class Container {
   public async getBean<T>(id: ID): Promise<T> {
     let bean = this.binds.get(id);
     if (bean !== undefined) return await bean.get();
-    throw new Error("ID解析失败");
+    throw new Error("ID解析失败:"+id.toString());
   }
 
   /**
